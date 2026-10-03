@@ -1,5 +1,5 @@
 // =====================================================================
-// my-tags.js  -  My personal tag filters (Type + Status)
+// my-tags.js  -  My personal tag filters (Type + Production + Status)
 //
 // HOW IT WORKS
 //  * my_tags.json holds, for every game I tagged, its "type" and "status".
@@ -37,6 +37,20 @@ const TAG_GROUPS = [
     ]
   },
   {
+    id: 'production',
+    title: 'Production',
+    sections: [
+      {
+        key: null, // no parent heading: plain list
+        options: [
+          { key: 'pnp', label: 'PnP' },
+          { key: 'produced_iran', label: 'Produced (Iran)' },
+          { key: 'produced_original', label: 'Produced (Original)' }
+        ]
+      }
+    ]
+  },
+  {
     id: 'status',
     title: 'Status',
     sections: [
@@ -53,7 +67,7 @@ const TAG_GROUPS = [
   }
 ];
 
-// myTagData = { "173346": { type: ["mine"], status: ["played"] }, ... }
+// myTagData = { "173346": { type: ["mine"], production: ["pnp"], status: ["played"] }, ... }
 let myTagData = {};
 
 function myTagKey(x) {

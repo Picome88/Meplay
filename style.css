@@ -733,3 +733,80 @@ body {
         font-size: 11px;
     }
 }
+
+
+/* =====================================================================
+   My filters (Type / Production / Status) - pinned in the top bar
+   ===================================================================== */
+.search {
+    flex-wrap: wrap;
+    row-gap: 0.75em;
+}
+
+.my-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-right: 1em;
+}
+
+.my-filters > details {
+    flex-grow: 0;
+}
+
+.my-filters .filter-dropdown {
+    border: 1.5px solid #b71c1c;
+    border-radius: 999px;
+    background: #fff;
+    color: #b71c1c;
+    font-weight: 600;
+    flex-grow: 0;
+}
+
+.my-filters .filter-dropdown > summary {
+    padding: 6px 14px;
+    cursor: pointer;
+}
+
+/* hide the generic filter icon, show a small arrow instead */
+.my-filters .filter-dropdown > summary .material-symbols-rounded {
+    display: none;
+}
+
+.my-filters .filter-dropdown > summary::after {
+    content: "";
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    padding: 2.5px;
+    transform: rotate(45deg);
+    margin: -3px 0 0 4px;
+}
+
+.my-filters .filter-dropdown[open] > summary::after {
+    transform: rotate(-135deg);
+    margin: 3px 0 0 4px;
+}
+
+/* Active = filled red pill (replaces the bottom-border indicator) */
+.my-filters .filter-dropdown.filter-active {
+    background: #b71c1c;
+    color: #fff;
+    border-bottom: 1.5px solid #b71c1c;
+}
+
+/* Dropdown panel keeps normal readable text */
+.my-filters .filter-dropdown-content {
+    color: #606c76;
+    font-weight: 300;
+    border-radius: 10px;
+    border: 1.5px solid #b71c1c;
+    overflow-x: hidden;
+}
+
+@media screen and (max-width: 640px) {
+    .my-filters {
+        flex: 1 1 100%;
+        margin-right: 0;
+        flex-wrap: wrap;
+    }
+}
