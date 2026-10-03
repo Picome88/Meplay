@@ -1,0 +1,5 @@
+certifi
+declxml
+pillow
+cryptography
+pynacl

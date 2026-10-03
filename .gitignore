@@ -1,0 +1,8 @@
+__pycache__
+.python-version
+*.sqlite
+*.sqlite-journal
+*.sqlite.gz
+
+# Private configuration (keep tokens secret!)
+.env
