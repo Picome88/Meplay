@@ -141,6 +141,7 @@ async function initializeDatabase(settings) {
     db = new SQL.Database(dbData);
     console.log('Database loaded successfully');
 
+    await loadMyTags();
     loadAllGames();
     initializeUI();
 
@@ -219,6 +220,8 @@ function loadAllGames() {
     } catch (e) {
       console.warn('Error parsing JSON for game:', row.id, e);
     }
+
+    applyMyTags(row);
 
     allGames.push(row);
   }
@@ -309,6 +312,7 @@ function setupSorting() {
 }
 
 function setupFilters() {
+  setupMyTagFilters();
   setupCategoriesFilter();
   setupMechanicsFilter();
   setupPlayersFilter();
@@ -848,12 +852,15 @@ function updateClearButtonVisibility(filters) {
     (selectedPlayingTime && selectedPlayingTime.length > 0) ||
     (selectedPreviousPlayers && selectedPreviousPlayers.length > 0) ||
     selectedMinAge !== null ||
-    selectedNumPlays !== null;
+    selectedNumPlays !== null ||
+    myTagsActive(filters);
 
   clearContainer.style.display = isAnyFilterActive ? 'flex' : 'none';
 }
 
 function updateFilterActiveStates(filters) {
+  updateMyTagActiveStates(filters);
+
   // Update categories filter
   const categoriesFilter = document.getElementById('facet-categories');
   if (categoriesFilter) {
@@ -950,6 +957,7 @@ function getFiltersFromURL() {
     selectedPreviousPlayers: params.get('previous_players')?.split(',').filter(Boolean) || [],
     selectedMinAge: minAgeParam ? { min: Number(minAgeParam.split('-')[0]), max: Number(minAgeParam.split('-')[1]) } : null,
     selectedNumPlays: numPlaysParam ? { min: Number(numPlaysParam.split('-')[0]), max: Number(numPlaysParam.split('-')[1]) } : null,
+    selectedMyTags: getMyTagFiltersFromURL(params),
     sortBy: params.get('sort') || 'name',
     page: Number(params.get('page')) || 1
   };
@@ -977,6 +985,7 @@ function getFiltersFromUI() {
     selectedPreviousPlayers,
     selectedMinAge,
     selectedNumPlays,
+    selectedMyTags: getMyTagFiltersFromUI(),
     sortBy,
     page: currentPage
   };
@@ -994,6 +1003,7 @@ function updateURLWithFilters(filters) {
   if (filters.selectedPreviousPlayers?.length) params.set('previous_players', filters.selectedPreviousPlayers.join(','));
   if (filters.selectedMinAge) params.set('min_age', `${filters.selectedMinAge.min}-${filters.selectedMinAge.max}`);
   if (filters.selectedNumPlays) params.set('numplays', `${filters.selectedNumPlays.min}-${filters.selectedNumPlays.max}`);
+  setMyTagURLParams(params, filters);
   if (filters.sortBy && filters.sortBy !== 'name') params.set('sort', filters.sortBy);
   if (filters.page && filters.page > 1) params.set('page', filters.page);
 
@@ -1023,6 +1033,8 @@ function updateUIFromState(state) {
       });
     }
   }
+
+  restoreMyTagUI(state);
 
   const playerRadio = document.querySelector(`input[name="players"][value="${state.selectedPlayerFilter}"]`);
   if (playerRadio) playerRadio.checked = true;
@@ -1110,6 +1122,10 @@ function filterGames(gamesToFilter, filters) {
   } = filters;
 
   return gamesToFilter.filter(game => {
+    if (!gameMatchesMyTags(game, filters.selectedMyTags)) {
+      return false;
+    }
+
     if (query && !game.name.toLowerCase().includes(query) &&
       !game.description.toLowerCase().includes(query)) {
       return false;
@@ -1240,6 +1256,8 @@ function updateCountsInDOM(facetId, counts, showZero = false) {
 }
 
 function updateAllFilterCounts(filters) {
+  updateMyTagCounts(filters);
+
   const catFilters = {
     ...filters,
     selectedCategories: []

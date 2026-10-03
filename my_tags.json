@@ -1,0 +1,12 @@
+{
+  "_help": "Each game id lists its Type and Status tags. Edit mode (next step) will update this file for you.",
+  "games": {
+    "47":     { "type": ["mine", "bga"], "status": ["played", "interested"] },
+    "173346": { "type": ["mine"],        "status": [] },
+    "177736": { "type": ["mine", "bga"], "status": ["played", "interested"] },
+    "208766": { "type": ["bga"],         "status": ["played"] },
+    "203828": { "type": ["bga"],         "status": ["interested"] },
+    "358669": { "type": ["mine"],        "status": [] },
+    "393325": { "type": ["mine"],        "status": [] }
+  }
+}
