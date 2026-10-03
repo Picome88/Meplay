@@ -29,9 +29,8 @@ const TAG_GROUPS = [
         key: 'digital',
         label: 'Digital (any)',
         options: [
-          { key: 'bga', label: 'Board Game Arena' },
-          { key: 'ready', label: 'Other site - ready to play' },
-          { key: 'beta', label: 'Other site - alpha / beta' },
+          { key: 'bga_ready', label: 'BGA - ready to play' },
+          { key: 'bga_beta', label: 'BGA - alpha / beta' },
           { key: 'other_site', label: 'Other site' }
         ]
       }
