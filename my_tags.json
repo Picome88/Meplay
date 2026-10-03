@@ -1,12 +1,14 @@
 {
   "_help": "Each game id lists its Type and Status tags. Edit mode (next step) will update this file for you.",
   "games": {
-    "47":     { "type": ["mine", "bga_ready"], "status": ["played", "interested"] },
-    "173346": { "type": ["mine"],        "status": [] },
-    "177736": { "type": ["mine", "bga_ready"], "status": ["played", "interested"] },
-    "208766": { "type": ["bga_ready"],         "status": ["played"] },
-    "203828": { "type": ["bga_ready"],         "status": ["interested"] },
-    "358669": { "type": ["mine"],        "status": [] },
-    "393325": { "type": ["mine"],        "status": [] }
+    "47": {"type":["mine","bga_ready"],"status":["played","interested"]},
+    "173346": {"type":["mine"]},
+    "177736": {"type":["mine","bga_ready"],"status":["played","interested"]},
+    "203828": {"type":["bga_ready"],"status":["interested"]},
+    "208766": {"type":["bga_ready"],"status":["played"]},
+    "302260": {"type":["mine"]},
+    "358669": {"type":["mine"]},
+    "393325": {"type":["mine"]},
+    "436400": {"type":["mine"]}
   }
 }
