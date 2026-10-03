@@ -9,7 +9,7 @@
 //    and Save. Save writes my_tags.json to GitHub using your token.
 //  * Your token is stored only in this browser (localStorage), never in code.
 //
-// Needs from my-tags.js: TAG_GROUPS, myTagData, applyMyTags,
+// Needs from my-tags.js: TAG_GROUPS, myTagData, applyMyTags, labelForTag, renderMyTagsRows,
 //                        MYTAGS_REPO, MYTAGS_FILE, MYTAGS_TOKEN_KEY
 // Needs from app-sqlite.js: allGames, filteredGames, onFilterChange
 // =====================================================================
@@ -40,16 +40,6 @@ function editEl(tag, className, text) {
   if (className) el.className = className;
   if (text !== undefined) el.textContent = text;
   return el;
-}
-
-function labelForTag(groupId, key) {
-  const group = TAG_GROUPS.find(g => g.id === groupId);
-  if (!group) return key;
-  for (const s of group.sections) {
-    const opt = s.options.find(o => o.key === key);
-    if (opt) return opt.label;
-  }
-  return key;
 }
 
 function gameById(id) {
@@ -92,11 +82,8 @@ function decorateCardForEdit(fragment, game) {
     openTagModal([id]);
   });
 
-  const chips = editEl('div', 'edit-chips');
-  fillChips(chips, id);
-
   const overlay = editEl('div', 'edit-overlay');
-  overlay.append(check, tagBtn, chips);
+  overlay.append(check, tagBtn);
   summary.appendChild(overlay);
 
   summary.addEventListener('click', e => {
@@ -106,21 +93,9 @@ function decorateCardForEdit(fragment, game) {
   });
 }
 
-function fillChips(container, id) {
-  container.textContent = '';
-  const entry = myTagData[id] || {};
-  TAG_GROUPS.forEach(g => {
-    (entry[g.id] || []).forEach(key => {
-      const chip = editEl('span', `edit-chip edit-chip-${g.id}`, labelForTag(g.id, key));
-      container.appendChild(chip);
-    });
-  });
-}
-
 function refreshCardChips(id) {
-  const card = document.querySelector(`.game-card[data-game-id="${CSS.escape(id)}"]`);
-  const chips = card && card.querySelector('.edit-chips');
-  if (chips) fillChips(chips, id);
+  const body = document.querySelector(`.game-card[data-game-id="${CSS.escape(id)}"] .my-tags-body`);
+  if (body) renderMyTagsRows(body, id);
 }
 
 function toggleSelected(id) {

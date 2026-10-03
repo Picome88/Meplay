@@ -891,32 +891,6 @@ body.edit-mode .game-card.edit-selected .game-summary {
     cursor: pointer;
 }
 
-.edit-chips {
-    position: absolute;
-    left: 3px;
-    right: 3px;
-    bottom: 2px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
-    justify-content: center;
-    max-height: 34px;
-    overflow: hidden;
-}
-
-.edit-chip {
-    padding: 1px 5px;
-    border-radius: 999px;
-    background: rgba(51, 51, 51, 0.85);
-    color: #fff;
-    font-size: 9px;
-    line-height: 1.3;
-    white-space: nowrap;
-}
-
-.edit-chip-production { background: rgba(21, 101, 192, 0.9); }
-.edit-chip-status { background: rgba(46, 125, 50, 0.9); }
-
 /* bottom bar */
 .edit-toolbar {
     display: none;
@@ -1095,4 +1069,54 @@ body.edit-mode .game-card.edit-selected .game-summary {
 
 .edit-toast-error {
     background: #b71c1c;
+}
+
+
+/* Selected options are shown in the filter button: keep it from growing forever */
+.filter-dropdown>summary .filter-title {
+    max-width: 18em;
+}
+
+.my-filters .filter-dropdown>summary .filter-title {
+    max-width: 26em;
+}
+
+/* "My tags" block at the bottom of the opened game panel */
+.my-tags-section {
+    padding: 10px 15px;
+    border-top: 1px solid #e0e0e0;
+    background: #fff;
+}
+
+.my-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 5px;
+}
+
+.my-tags-group {
+    min-width: 62px;
+    font-size: 11px;
+    color: #888;
+}
+
+.my-chip {
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: #555;
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.my-chip-type { background: #b71c1c; }
+.my-chip-production { background: #1565c0; }
+.my-chip-status { background: #2e7d32; }
+
+.my-tags-empty {
+    color: #999;
+    font-style: italic;
 }

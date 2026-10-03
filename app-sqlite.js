@@ -860,6 +860,7 @@ function updateClearButtonVisibility(filters) {
 
 function updateFilterActiveStates(filters) {
   updateMyTagActiveStates(filters);
+  updateFilterSummaries();
 
   // Update categories filter
   const categoriesFilter = document.getElementById('facet-categories');
@@ -1598,6 +1599,7 @@ function renderGameCard(game) {
     bggLink.href = `https://boardgamegeek.com/boardgame/${game.id}`;
   }
 
+  renderMyTagsSection(clone, game);
   if (typeof decorateCardForEdit === 'function') decorateCardForEdit(clone, game);
 
   return clone;
