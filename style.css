@@ -810,3 +810,289 @@ body {
         flex-wrap: wrap;
     }
 }
+
+
+/* =====================================================================
+   Edit mode (my-edit.js)
+   ===================================================================== */
+.edit-toggle {
+    margin-left: 0.5em;
+    padding: 6px 16px;
+    border: 1.5px solid #333;
+    border-radius: 999px;
+    background: #fff;
+    color: #333;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.edit-toggle.active {
+    background: #333;
+    color: #fff;
+}
+
+/* card overlay: hidden outside edit mode */
+.edit-overlay {
+    display: none;
+}
+
+body.edit-mode .edit-overlay {
+    display: block;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+body.edit-mode .game-summary {
+    cursor: pointer;
+}
+
+.edit-check {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #b71c1c;
+    background: rgba(255, 255, 255, 0.9);
+    color: transparent;
+    font-size: 14px;
+    line-height: 18px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.game-card.edit-selected .edit-check {
+    background: #b71c1c;
+    color: #fff;
+}
+
+body.edit-mode .game-card.edit-selected .game-summary {
+    background: rgba(183, 28, 28, 0.12);
+    outline: 2px solid #b71c1c;
+    outline-offset: -2px;
+}
+
+.edit-tag-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    pointer-events: auto;
+    padding: 2px 8px;
+    border: 1px solid #333;
+    border-radius: 999px;
+    background: #fff;
+    color: #333;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.edit-chips {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    bottom: 2px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+    max-height: 34px;
+    overflow: hidden;
+}
+
+.edit-chip {
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: rgba(51, 51, 51, 0.85);
+    color: #fff;
+    font-size: 9px;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.edit-chip-production { background: rgba(21, 101, 192, 0.9); }
+.edit-chip-status { background: rgba(46, 125, 50, 0.9); }
+
+/* bottom bar */
+.edit-toolbar {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    z-index: 2000;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    max-width: calc(100vw - 16px);
+    padding: 8px 12px;
+    background: #222;
+    color: #fff;
+    border-radius: 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.edit-toolbar.show {
+    display: flex;
+}
+
+.edit-info {
+    font-weight: 600;
+    margin-right: 6px;
+}
+
+.edit-btn {
+    padding: 6px 12px;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    background: #fff;
+    color: #222;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.edit-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.edit-btn-primary {
+    background: #b71c1c;
+    border-color: #b71c1c;
+    color: #fff;
+}
+
+.edit-btn-save {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: #fff;
+}
+
+.edit-btn-ghost {
+    background: transparent;
+    color: #ddd;
+    border-color: #666;
+}
+
+.edit-modal .edit-btn-ghost {
+    color: #666;
+    border-color: #bbb;
+}
+
+/* modal */
+.edit-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+}
+
+.edit-modal {
+    width: min(420px, 100%);
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    padding: 18px 20px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    color: #444;
+}
+
+.edit-modal-title {
+    margin: 0 0 4px;
+    font-size: 18px;
+    color: #222;
+}
+
+.edit-modal-sub {
+    margin: 0 0 10px;
+    line-height: 1.4;
+}
+
+.edit-group-title {
+    margin: 14px 0 4px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #b71c1c;
+}
+
+.edit-section-title {
+    margin: 6px 0 2px;
+    font-weight: 600;
+}
+
+.edit-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+}
+
+.edit-options.edit-indent {
+    padding-left: 14px;
+}
+
+.edit-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    cursor: pointer;
+}
+
+.edit-steps {
+    margin: 0 0 10px;
+    padding-left: 20px;
+    line-height: 1.5;
+}
+
+.edit-token-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.edit-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.edit-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 120px;
+    transform: translateX(-50%);
+    z-index: 4000;
+    max-width: calc(100vw - 24px);
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: #2e7d32;
+    color: #fff;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.edit-toast.show {
+    opacity: 1;
+}
+
+.edit-toast-error {
+    background: #b71c1c;
+}

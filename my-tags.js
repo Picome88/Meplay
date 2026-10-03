@@ -10,6 +10,11 @@
 //   { key: 'sara', label: 'Sara' },
 // =====================================================================
 
+// Where my_tags.json lives (used by edit mode, see my-edit.js)
+const MYTAGS_REPO = 'Picome88/Meplay';
+const MYTAGS_FILE = 'my_tags.json';
+const MYTAGS_TOKEN_KEY = 'meplay_gh_token';
+
 const TAG_GROUPS = [
   {
     id: 'type',
@@ -75,16 +80,36 @@ function myTagKey(x) {
 }
 
 async function loadMyTags() {
-  try {
-    const response = await fetch('./my_tags.json?v=' + Date.now(), { cache: 'no-store' });
-    if (!response.ok) throw new Error(response.status);
-    const data = await response.json();
-    myTagData = data.games || {};
-    console.log('Loaded my_tags.json:', Object.keys(myTagData).length, 'games tagged');
-  } catch (e) {
-    console.warn('Could not load my_tags.json (tag filters will be empty):', e);
-    myTagData = {};
+  let data = null;
+
+  // If a token is saved (edit mode), read straight from GitHub: always the
+  // newest version, even before GitHub Pages has finished rebuilding.
+  let token = '';
+  try { token = localStorage.getItem(MYTAGS_TOKEN_KEY) || ''; } catch (e) { /* ignore */ }
+  if (token) {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${MYTAGS_REPO}/contents/${MYTAGS_FILE}?t=${Date.now()}`,
+        { cache: 'no-store', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.raw+json' } }
+      );
+      if (res.ok) data = await res.json();
+    } catch (e) {
+      console.warn('Could not read tags from GitHub API, using the published file instead:', e);
+    }
   }
+
+  if (!data) {
+    try {
+      const response = await fetch('./my_tags.json?v=' + Date.now(), { cache: 'no-store' });
+      if (!response.ok) throw new Error(response.status);
+      data = await response.json();
+    } catch (e) {
+      console.warn('Could not load my_tags.json (tag filters will be empty):', e);
+    }
+  }
+
+  myTagData = (data && data.games) || {};
+  console.log('Loaded my_tags.json:', Object.keys(myTagData).length, 'games tagged');
 }
 
 // Which parent-heading key does an option belong to? (e.g. mine -> physical)

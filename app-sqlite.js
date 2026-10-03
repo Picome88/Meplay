@@ -1598,6 +1598,8 @@ function renderGameCard(game) {
     bggLink.href = `https://boardgamegeek.com/boardgame/${game.id}`;
   }
 
+  if (typeof decorateCardForEdit === 'function') decorateCardForEdit(clone, game);
+
   return clone;
 }
 
