@@ -62,7 +62,7 @@
     "254640": {"type":["bga_ready"],"status":["learned","played","replay"]},
     "263918": {"type":["bga_ready"],"status":["interested"]},
     "268586": {"type":["bga_ready"],"status":["played","replay"]},
-    "271324": {"type":["mine","mohsen"],"production":["produced_iran"],"status":["learned","played","replay"]},
+    "271324": {"type":["mohsen"],"production":["produced_iran"],"status":["learned","played","replay"]},
     "274841": {"type":["bga_ready","mohsen"],"production":["produced_iran"],"status":["interested"]},
     "276042": {"type":["bga_ready","mine","mohsen"],"production":["produced_iran"],"status":["learned","played","replay"]},
     "286749": {"type":["mohsen"],"production":["produced_iran"],"status":["interested"]},
