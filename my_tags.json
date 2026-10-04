@@ -90,7 +90,7 @@
     "199561": {"type":["mohsen"],"production":["produced_iran"],"status":["interested"]},
     "200077": {"status":["played"]},
     "200680": {"type":["bga_ready","mohsen"],"production":["produced_iran"],"status":["interested","played","replay"]},
-    "203828": {"type":["bga_ready"],"status":["played","replay"]},
+    "203828": {"status":["played","replay"]},
     "204472": {"type":["mine"],"production":["produced_iran"],"status":["played"]},
     "204583": {"type":["mine","mohsen","bga_ready"],"production":["pnp","produced_iran"],"status":["learned","played","replay"]},
     "205896": {"type":["mohsen"],"production":["produced_iran"],"status":["interested"]},
