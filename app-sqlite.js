@@ -243,7 +243,7 @@ function initializeUI() {
   updateStats();
 
   window.addEventListener('popstate', (event) => {
-    const state = event.state || getFiltersFromURL();
+    const state = (event.state && event.state.tri) ? event.state : getFiltersFromURL();
     updateUIFromState(state);
     applyFiltersAndSort(state);
     updateResults();
@@ -653,6 +653,178 @@ function setupNumPlaysFilter() {
   createRefinementFilter('facet-numplays', 'Number of plays', items, 'numplays', true);
 }
 
+// =====================================================================
+// 4-state checkbox filters: Off / OR / AND / Exclude
+// One checkbox cycles through the 4 states on each click.
+//   state 0 = Off, 1 = OR (include), 2 = AND (must have), 3 = Exclude
+// All the matching rules live in matchesTri() below (one single function).
+// =====================================================================
+const TRI_STATES = [
+  { set: null,  label: 'Off',             icon: '' },
+  { set: 'or',  label: 'Include (OR)',    icon: '\u2713' },
+  { set: 'and', label: 'Must have (AND)', icon: '&' },
+  { set: 'not', label: 'Exclude',         icon: '\u2715' }
+];
+
+// Filters that use the 4-state checkbox ("key" is the name used in the URL)
+const TRI_BASE_FILTERS = [
+  { key: 'categories',       input: 'categories',       facet: 'facet-categories' },
+  { key: 'mechanics',        input: 'mechanics',        facet: 'facet-mechanics' },
+  { key: 'weight',           input: 'weight',           facet: 'facet-weight' },
+  { key: 'playing_time',     input: 'playing_time',     facet: 'facet-playing-time' },
+  { key: 'previous_players', input: 'previous_players', facet: 'facet-previous-players' }
+];
+
+function triFilterList() {
+  const list = TRI_BASE_FILTERS.slice();
+  // my tag groups (type / production / status) - input names are my_type etc.
+  TAG_GROUPS.forEach(g => list.push({ key: g.id, input: `my_${g.id}`, facet: `facet-my-${g.id}` }));
+  return list;
+}
+
+function emptyTriSel() {
+  return { or: [], and: [], not: [] };
+}
+
+function emptyTri() {
+  const tri = {};
+  triFilterList().forEach(f => { tri[f.key] = emptyTriSel(); });
+  return tri;
+}
+
+function triSelIsActive(sel) {
+  return !!sel && (sel.or.length > 0 || sel.and.length > 0 || sel.not.length > 0);
+}
+
+function triAnyActive(tri) {
+  return !!tri && triFilterList().some(f => triSelIsActive(tri[f.key]));
+}
+
+// THE rule, used by all the 4-state filters:
+//  1. if "or" is not empty, the game needs at least one value from "or"
+//  2. the game needs every value in "and"
+//  3. the game must have no value from "not"
+// An empty selection lets every game pass.
+function matchesTri(gameValues, sel) {
+  if (!sel) return true;
+  const values = gameValues || [];
+  const has = values instanceof Set ? (v => values.has(v)) : (v => values.includes(v));
+  if (sel.not.some(has)) return false;
+  if (!sel.and.every(has)) return false;
+  if (sel.or.length > 0 && !sel.or.some(has)) return false;
+  return true;
+}
+
+// The values a game has for one of the 4-state filters
+function triGameValues(key, game) {
+  switch (key) {
+    case 'categories': return game.categories || [];
+    case 'mechanics': return game.mechanics || [];
+    case 'weight': {
+      const name = game.weight ? getComplexityName(game.weight) : '';
+      return name ? [name] : [];
+    }
+    case 'playing_time': return game.playing_time ? [game.playing_time] : [];
+    case 'previous_players': return game.previous_players || [];
+    default: return (game.my_tags && game.my_tags[key]) || [];   // my tag groups
+  }
+}
+
+function getTriFromURL(params) {
+  const list = name => params.get(name)?.split(',').filter(Boolean) || [];
+  const tri = {};
+  triFilterList().forEach(f => {
+    const not = list(`${f.key}_not`);
+    const and = list(`${f.key}_and`).filter(v => !not.includes(v));
+    const or = list(f.key).filter(v => !not.includes(v) && !and.includes(v));
+    tri[f.key] = { or, and, not };
+  });
+  return tri;
+}
+
+function setTriURLParams(params, tri) {
+  triFilterList().forEach(f => {
+    const sel = tri && tri[f.key];
+    if (!sel) return;
+    if (sel.or.length) params.set(f.key, sel.or.join(','));
+    if (sel.and.length) params.set(`${f.key}_and`, sel.and.join(','));
+    if (sel.not.length) params.set(`${f.key}_not`, sel.not.join(','));
+  });
+}
+
+function getTriFromUI() {
+  const tri = {};
+  triFilterList().forEach(f => {
+    const sel = emptyTriSel();
+    document.querySelectorAll(`input[type="checkbox"][name="${f.input}"]`).forEach(cb => {
+      const state = Number(cb.dataset.state) || 0;
+      if (state > 0) sel[TRI_STATES[state].set].push(cb.value);
+    });
+    tri[f.key] = sel;
+  });
+  return tri;
+}
+
+// Puts one checkbox in a state (0-3): look, tooltip, aria-label
+function setTriState(input, state) {
+  state = Number(state) || 0;
+  input.dataset.state = String(state);
+  input.checked = state !== 0;   // stays true for any active state, so the option is never hidden
+  const name = input.closest('label')?.querySelector('.filter-label')?.textContent || input.value;
+  const text = TRI_STATES[state].label;
+  input.setAttribute('aria-label', `${name}: ${text}`);
+  const row = input.closest('label');
+  if (row) row.title = text;
+}
+
+function cycleTriState(input) {
+  setTriState(input, ((Number(input.dataset.state) || 0) + 1) % 4);
+}
+
+function restoreTriUI(tri) {
+  document.querySelectorAll('input[type="checkbox"][data-state]').forEach(cb => setTriState(cb, 0));
+  triFilterList().forEach(f => {
+    const sel = tri && tri[f.key];
+    if (!sel) return;
+    [['or', 1], ['and', 2], ['not', 3]].forEach(([setName, state]) => {
+      (sel[setName] || []).forEach(value => {
+        const cb = document.querySelector(
+          `input[type="checkbox"][name="${f.input}"][value="${CSS.escape(value)}"]`
+        );
+        if (cb) setTriState(cb, state);
+      });
+    });
+  });
+}
+
+// Click / keyboard on the options of a dropdown (set up once per dropdown)
+function setupTriStateEvents(container) {
+  const triInputOf = target => {
+    const row = target.closest && target.closest('label.filter-item');
+    const input = row && row.querySelector('input[type="checkbox"][data-state]');
+    return input || null;
+  };
+
+  container.addEventListener('click', event => {
+    const input = triInputOf(event.target);
+    if (!input) return;
+    event.preventDefault();   // stop the native on/off toggle
+    cycleTriState(input);
+    onFilterChange();
+    // the browser puts back the native "checked" after a cancelled click: set it again
+    setTimeout(() => { input.checked = Number(input.dataset.state) !== 0; }, 0);
+  });
+
+  container.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;   // Space already produces a click
+    const input = event.target.matches && event.target.matches('input[type="checkbox"][data-state]') ? event.target : null;
+    if (!input) return;
+    event.preventDefault();
+    cycleTriState(input);
+    onFilterChange();
+  });
+}
+
 function createRefinementFilter(facetId, title, items, attributeName, isRadio = false) {
   const container = document.getElementById(facetId);
   if (!container) return;
@@ -678,6 +850,7 @@ function createRefinementFilter(facetId, title, items, attributeName, isRadio = 
     input.name = attributeName;
     input.value = value;
     if (checked) input.checked = true;
+    if (!isRadio) input.setAttribute('data-state', '0');   // 4-state checkbox (Off / OR / AND / Exclude)
     span.textContent = label;
 
     // Add level and parent attributes for hierarchical structure
@@ -704,15 +877,25 @@ function createRefinementFilter(facetId, title, items, attributeName, isRadio = 
   details.id = facetId;
   clone.querySelector('.filter-title').textContent = title;
   clone.querySelector('.filter-dropdown-content').innerHTML = filterItemsHtml;
-  container.replaceWith(clone);
+
+  // Wrap the dropdown: [ button ] with the chips of the active options just below it
+  const group = document.createElement('div');
+  group.className = 'filter-group';
+  group.appendChild(clone);
+  const chips = document.createElement('div');
+  chips.className = 'filter-chips';
+  group.appendChild(chips);
+  container.replaceWith(group);
 
   const newContainer = document.getElementById(facetId);
   if (newContainer) {
     if (newContainer.tagName === 'DETAILS') {
       newContainer.open = false;
     }
+    if (!isRadio) setupTriStateEvents(newContainer);
+
     newContainer.addEventListener('change', (event) => {
-      if (event.target.tagName === 'INPUT') {
+      if (event.target.tagName === 'INPUT' && event.target.type === 'radio') {
         if (attributeName === 'players') {
           const selectedValue = event.target.value;
           const allPlayerLabels = newContainer.querySelectorAll('label.filter-item[data-level]');
@@ -833,114 +1016,37 @@ function updateClearButtonVisibility(filters) {
 
   const {
     query,
-    selectedCategories,
-    selectedMechanics,
     selectedPlayerFilter,
-    selectedWeight,
-    selectedPlayingTime,
-    selectedPreviousPlayers,
     selectedMinAge,
     selectedNumPlays
   } = filters;
 
   const isAnyFilterActive =
     (query && query !== '') ||
-    (selectedCategories && selectedCategories.length > 0) ||
-    (selectedMechanics && selectedMechanics.length > 0) ||
     (selectedPlayerFilter && selectedPlayerFilter !== 'any') ||
-    (selectedWeight && selectedWeight.length > 0) ||
-    (selectedPlayingTime && selectedPlayingTime.length > 0) ||
-    (selectedPreviousPlayers && selectedPreviousPlayers.length > 0) ||
     selectedMinAge !== null ||
     selectedNumPlays !== null ||
-    myTagsActive(filters);
+    triAnyActive(filters.tri);
 
   clearContainer.style.display = isAnyFilterActive ? 'flex' : 'none';
 }
 
 function updateFilterActiveStates(filters) {
-  updateMyTagActiveStates(filters);
-  updateFilterSummaries();
+  const setActive = (facetId, active) => {
+    const el = document.getElementById(facetId);
+    if (el) el.classList.toggle('filter-active', !!active);
+  };
 
-  // Update categories filter
-  const categoriesFilter = document.getElementById('facet-categories');
-  if (categoriesFilter) {
-    if (filters.selectedCategories && filters.selectedCategories.length > 0) {
-      categoriesFilter.classList.add('filter-active');
-    } else {
-      categoriesFilter.classList.remove('filter-active');
-    }
-  }
+  // 4-state filters
+  triFilterList().forEach(f => setActive(f.facet, triSelIsActive(filters.tri && filters.tri[f.key])));
 
-  // Update mechanics filter
-  const mechanicsFilter = document.getElementById('facet-mechanics');
-  if (mechanicsFilter) {
-    if (filters.selectedMechanics && filters.selectedMechanics.length > 0) {
-      mechanicsFilter.classList.add('filter-active');
-    } else {
-      mechanicsFilter.classList.remove('filter-active');
-    }
-  }
+  // radio filters
+  setActive('facet-players', filters.selectedPlayerFilter && filters.selectedPlayerFilter !== 'any');
+  setActive('facet-min-age', filters.selectedMinAge !== null);
+  setActive('facet-numplays', filters.selectedNumPlays !== null);
 
-  // Update players filter
-  const playersFilter = document.getElementById('facet-players');
-  if (playersFilter) {
-    if (filters.selectedPlayerFilter && filters.selectedPlayerFilter !== 'any') {
-      playersFilter.classList.add('filter-active');
-    } else {
-      playersFilter.classList.remove('filter-active');
-    }
-  }
-
-  // Update weight filter
-  const weightFilter = document.getElementById('facet-weight');
-  if (weightFilter) {
-    if (filters.selectedWeight && filters.selectedWeight.length > 0) {
-      weightFilter.classList.add('filter-active');
-    } else {
-      weightFilter.classList.remove('filter-active');
-    }
-  }
-
-  // Update playing time filter
-  const playingTimeFilter = document.getElementById('facet-playing-time');
-  if (playingTimeFilter) {
-    if (filters.selectedPlayingTime && filters.selectedPlayingTime.length > 0) {
-      playingTimeFilter.classList.add('filter-active');
-    } else {
-      playingTimeFilter.classList.remove('filter-active');
-    }
-  }
-
-  // Update min age filter
-  const minAgeFilter = document.getElementById('facet-min-age');
-  if (minAgeFilter) {
-    if (filters.selectedMinAge !== null) {
-      minAgeFilter.classList.add('filter-active');
-    } else {
-      minAgeFilter.classList.remove('filter-active');
-    }
-  }
-
-  // Update previous players filter
-  const prevPlayersFilter = document.getElementById('facet-previous-players');
-  if (prevPlayersFilter) {
-    if (filters.selectedPreviousPlayers && filters.selectedPreviousPlayers.length > 0) {
-      prevPlayersFilter.classList.add('filter-active');
-    } else {
-      prevPlayersFilter.classList.remove('filter-active');
-    }
-  }
-
-  // Update number of plays filter
-  const numPlaysFilter = document.getElementById('facet-numplays');
-  if (numPlaysFilter) {
-    if (filters.selectedNumPlays !== null) {
-      numPlaysFilter.classList.add('filter-active');
-    } else {
-      numPlaysFilter.classList.remove('filter-active');
-    }
-  }
+  // the selected options are shown as chips under each button
+  updateFilterChips();
 }
 
 function getFiltersFromURL() {
@@ -950,15 +1056,10 @@ function getFiltersFromURL() {
 
   return {
     query: params.get('q') || '',
-    selectedCategories: params.get('categories')?.split(',').filter(Boolean) || [],
-    selectedMechanics: params.get('mechanics')?.split(',').filter(Boolean) || [],
     selectedPlayerFilter: params.get('players') || 'any',
-    selectedWeight: params.get('weight')?.split(',').filter(Boolean) || [],
-    selectedPlayingTime: params.get('playing_time')?.split(',').filter(Boolean) || [],
-    selectedPreviousPlayers: params.get('previous_players')?.split(',').filter(Boolean) || [],
     selectedMinAge: minAgeParam ? { min: Number(minAgeParam.split('-')[0]), max: Number(minAgeParam.split('-')[1]) } : null,
     selectedNumPlays: numPlaysParam ? { min: Number(numPlaysParam.split('-')[0]), max: Number(numPlaysParam.split('-')[1]) } : null,
-    selectedMyTags: getMyTagFiltersFromURL(params),
+    tri: getTriFromURL(params),
     sortBy: params.get('sort') || 'name',
     page: Number(params.get('page')) || 1
   };
@@ -966,27 +1067,17 @@ function getFiltersFromURL() {
 
 function getFiltersFromUI() {
   const query = document.getElementById('search-input')?.value.toLowerCase().trim() || '';
-  const selectedCategories = getSelectedValues('categories');
-  const selectedMechanics = getSelectedValues('mechanics');
   const selectedPlayerFilter = document.querySelector('input[name="players"]:checked')?.value || 'any';
-  const selectedWeight = getSelectedValues('weight');
-  const selectedPlayingTime = getSelectedValues('playing_time');
-  const selectedPreviousPlayers = getSelectedValues('previous_players');
   const selectedMinAge = getSelectedRange('min_age');
   const selectedNumPlays = getSelectedRange('numplays');
   const sortBy = document.getElementById('sort-select')?.value || 'name';
 
   return {
     query,
-    selectedCategories,
-    selectedMechanics,
     selectedPlayerFilter,
-    selectedWeight,
-    selectedPlayingTime,
-    selectedPreviousPlayers,
     selectedMinAge,
     selectedNumPlays,
-    selectedMyTags: getMyTagFiltersFromUI(),
+    tri: getTriFromUI(),
     sortBy,
     page: currentPage
   };
@@ -996,15 +1087,10 @@ function updateURLWithFilters(filters) {
   const params = new URLSearchParams();
 
   if (filters.query) params.set('q', filters.query);
-  if (filters.selectedCategories?.length) params.set('categories', filters.selectedCategories.join(','));
-  if (filters.selectedMechanics?.length) params.set('mechanics', filters.selectedMechanics.join(','));
   if (filters.selectedPlayerFilter && filters.selectedPlayerFilter !== 'any') params.set('players', filters.selectedPlayerFilter);
-  if (filters.selectedWeight?.length) params.set('weight', filters.selectedWeight.join(','));
-  if (filters.selectedPlayingTime?.length) params.set('playing_time', filters.selectedPlayingTime.join(','));
-  if (filters.selectedPreviousPlayers?.length) params.set('previous_players', filters.selectedPreviousPlayers.join(','));
   if (filters.selectedMinAge) params.set('min_age', `${filters.selectedMinAge.min}-${filters.selectedMinAge.max}`);
   if (filters.selectedNumPlays) params.set('numplays', `${filters.selectedNumPlays.min}-${filters.selectedNumPlays.max}`);
-  setMyTagURLParams(params, filters);
+  setTriURLParams(params, filters.tri);
   if (filters.sortBy && filters.sortBy !== 'name') params.set('sort', filters.sortBy);
   if (filters.page && filters.page > 1) params.set('page', filters.page);
 
@@ -1015,27 +1101,8 @@ function updateURLWithFilters(filters) {
 function updateUIFromState(state) {
   document.getElementById('search-input').value = state.query;
 
-  document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-
-  const checkboxFilters = {
-    'categories': state.selectedCategories,
-    'mechanics': state.selectedMechanics,
-    'weight': state.selectedWeight,
-    'playing_time': state.selectedPlayingTime,
-    'previous_players': state.selectedPreviousPlayers,
-  };
-
-  for (const name in checkboxFilters) {
-    const values = checkboxFilters[name];
-    if (values?.length) {
-      values.forEach(value => {
-        const cb = document.querySelector(`input[type="checkbox"][name="${name}"][value="${CSS.escape(value)}"]`);
-        if (cb) cb.checked = true;
-      });
-    }
-  }
-
-  restoreMyTagUI(state);
+  // all 4-state checkboxes: reset to Off, then set the saved states
+  restoreTriUI(state.tri);
 
   const playerRadio = document.querySelector(`input[name="players"][value="${state.selectedPlayerFilter}"]`);
   if (playerRadio) playerRadio.checked = true;
@@ -1112,33 +1179,22 @@ function setupClearAllButton() {
 function filterGames(gamesToFilter, filters) {
   const {
     query,
-    selectedCategories,
-    selectedMechanics,
     selectedPlayerFilter,
-    selectedWeight,
-    selectedPlayingTime,
-    selectedPreviousPlayers,
     selectedMinAge,
     selectedNumPlays
   } = filters;
+  const tri = filters.tri || {};
+  const triFilters = triFilterList();
 
   return gamesToFilter.filter(game => {
-    if (!gameMatchesMyTags(game, filters.selectedMyTags)) {
-      return false;
+    // 4-state filters (categories, mechanics, complexity, playing time,
+    // previous players, type, production, status): one shared rule
+    for (const f of triFilters) {
+      if (!matchesTri(triGameValues(f.key, game), tri[f.key])) return false;
     }
 
     if (query && !game.name.toLowerCase().includes(query) &&
       !game.description.toLowerCase().includes(query)) {
-      return false;
-    }
-
-    if (selectedCategories.length > 0 &&
-      !selectedCategories.some(cat => game.categories.includes(cat))) {
-      return false;
-    }
-
-    if (selectedMechanics.length > 0 &&
-      !selectedMechanics.some(mech => game.mechanics.includes(mech))) {
       return false;
     }
 
@@ -1166,22 +1222,6 @@ function filterGames(gamesToFilter, filters) {
           return false;
         }
       }
-    }
-
-    if (selectedWeight.length > 0) {
-      const gameWeightName = getComplexityName(game.weight);
-      if (!gameWeightName || !selectedWeight.includes(gameWeightName)) {
-        return false;
-      }
-    }
-
-    if (selectedPlayingTime.length > 0 && !selectedPlayingTime.includes(game.playing_time)) {
-      return false;
-    }
-
-    if (selectedPreviousPlayers.length > 0 &&
-      !selectedPreviousPlayers.some(player => game.previous_players.includes(player))) {
-      return false;
     }
 
     if (selectedMinAge && (game.min_age < selectedMinAge.min || game.min_age > selectedMinAge.max)) {
@@ -1257,33 +1297,22 @@ function updateCountsInDOM(facetId, counts, showZero = false) {
 }
 
 function updateAllFilterCounts(filters) {
-  updateMyTagCounts(filters);
-
-  const catFilters = {
-    ...filters,
-    selectedCategories: []
-  };
-  const gamesForCatCount = filterGames(allGames, catFilters);
-  const categoryCounts = {};
-  gamesForCatCount.forEach(game => {
-    game.categories.forEach(cat => {
-      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  // 4-state filters: for each one, count the values among the games that pass
+  // all the OTHER filters (its own selection is cleared first)
+  triFilterList().forEach(f => {
+    const without = {
+      ...filters,
+      tri: { ...(filters.tri || emptyTri()), [f.key]: emptyTriSel() }
+    };
+    const counts = {};
+    filterGames(allGames, without).forEach(game => {
+      triGameValues(f.key, game).forEach(value => {
+        counts[value] = (counts[value] || 0) + 1;
+      });
     });
+    // my tag options are always listed, even with a count of 0
+    updateCountsInDOM(f.facet, counts, TAG_GROUPS.some(g => g.id === f.key));
   });
-  updateCountsInDOM('facet-categories', categoryCounts);
-
-  const mechFilters = {
-    ...filters,
-    selectedMechanics: []
-  };
-  const gamesForMechCount = filterGames(allGames, mechFilters);
-  const mechanicCounts = {};
-  gamesForMechCount.forEach(game => {
-    game.mechanics.forEach(mech => {
-      mechanicCounts[mech] = (mechanicCounts[mech] || 0) + 1;
-    });
-  });
-  updateCountsInDOM('facet-mechanics', mechanicCounts);
 
   const playerFilters = {
     ...filters,
@@ -1312,35 +1341,6 @@ function updateAllFilterCounts(filters) {
   });
   updateCountsInDOM('facet-players', playerCounts, true);
 
-  const weightFilters = {
-    ...filters,
-    selectedWeight: []
-  };
-  const gamesForWeightCount = filterGames(allGames, weightFilters);
-  const weightCounts = {};
-  gamesForWeightCount.forEach(game => {
-    if (game.weight) {
-      const name = getComplexityName(game.weight);
-      if (name) {
-        weightCounts[name] = (weightCounts[name] || 0) + 1;
-      }
-    }
-  });
-  updateCountsInDOM('facet-weight', weightCounts);
-
-  const playingTimeFilters = {
-    ...filters,
-    selectedPlayingTime: []
-  };
-  const gamesForPlayingTimeCount = filterGames(allGames, playingTimeFilters);
-  const playingTimeCounts = {};
-  gamesForPlayingTimeCount.forEach(game => {
-    if (game.playing_time) {
-      playingTimeCounts[game.playing_time] = (playingTimeCounts[game.playing_time] || 0) + 1;
-    }
-  });
-  updateCountsInDOM('facet-playing-time', playingTimeCounts);
-
   const minAgeFilters = {
     ...filters,
     selectedMinAge: null
@@ -1358,19 +1358,6 @@ function updateAllFilterCounts(filters) {
     }
   });
   updateCountsInDOM('facet-min-age', minAgeCounts, true);
-
-  const prevPlayersFilters = {
-    ...filters,
-    selectedPreviousPlayers: []
-  };
-  const gamesForPrevPlayersCount = filterGames(allGames, prevPlayersFilters);
-  const prevPlayerCounts = {};
-  gamesForPrevPlayersCount.forEach(game => {
-    game.previous_players.forEach(player => {
-      prevPlayerCounts[player] = (prevPlayerCounts[player] || 0) + 1;
-    });
-  });
-  updateCountsInDOM('facet-previous-players', prevPlayerCounts);
 
   const numPlaysFilters = {
     ...filters,

@@ -8,6 +8,10 @@
 //  * The bottom bar lets you select all filtered games, tag the selection,
 //    and Save. Save writes my_tags.json to GitHub using your token.
 //  * Your token is stored only in this browser (localStorage), never in code.
+//  * "Update" button (top bar, always visible): starts the GitHub Action that
+//    refreshes the game list from BGG now, and tells you when it is finished.
+//    It uses the same token (needs "Actions: Read and write" too).
+//  * Select mode (my-select.js) shares the selection system of this file.
 //
 // Needs from my-tags.js: TAG_GROUPS, myTagData, applyMyTags, labelForTag, renderMyTagsRows,
 //                        MYTAGS_REPO, MYTAGS_FILE, MYTAGS_TOKEN_KEY
@@ -64,6 +68,31 @@ function editToast(message, isError = false) {
 // ---------- cards ----------
 
 // Called by renderGameCard() for every card.
+// True when clicking a card must select it (Edit mode or Select mode)
+function isSelecting() {
+  return editState.on || (typeof isSelectModeOn === 'function' && isSelectModeOn());
+}
+
+// One hook for every change of the selection: refreshes both toolbars
+function onSelectionChanged() {
+  refreshToolbar();
+  if (typeof refreshSelectToolbar === 'function') refreshSelectToolbar();
+}
+
+function selectAllFiltered() {
+  filteredGames.forEach(g => editState.selected.add(String(g.id)));
+  document.querySelectorAll('.game-card[data-game-id]').forEach(c => {
+    c.classList.toggle('edit-selected', editState.selected.has(c.dataset.gameId));
+  });
+  onSelectionChanged();
+}
+
+function clearSelection() {
+  editState.selected.clear();
+  document.querySelectorAll('.game-card.edit-selected').forEach(c => c.classList.remove('edit-selected'));
+  onSelectionChanged();
+}
+
 function decorateCardForEdit(fragment, game) {
   const card = fragment.querySelector('.game-card');
   const summary = card && card.querySelector('.game-summary');
@@ -87,8 +116,8 @@ function decorateCardForEdit(fragment, game) {
   summary.appendChild(overlay);
 
   summary.addEventListener('click', e => {
-    if (!editState.on) return;
-    e.preventDefault();           // do not open the details card in edit mode
+    if (!isSelecting()) return;
+    e.preventDefault();           // do not open the details card in edit / select mode
     toggleSelected(id);
   });
 }
@@ -103,7 +132,7 @@ function toggleSelected(id) {
   else editState.selected.add(id);
   const card = document.querySelector(`.game-card[data-game-id="${CSS.escape(id)}"]`);
   if (card) card.classList.toggle('edit-selected', editState.selected.has(id));
-  refreshToolbar();
+  onSelectionChanged();
 }
 
 // ---------- toolbar ----------
@@ -120,22 +149,12 @@ function buildToolbar() {
   const selectAll = editEl('button', 'edit-btn', 'Select all filtered');
   selectAll.id = 'edit-select-all';
   selectAll.type = 'button';
-  selectAll.addEventListener('click', () => {
-    filteredGames.forEach(g => editState.selected.add(String(g.id)));
-    document.querySelectorAll('.game-card[data-game-id]').forEach(c => {
-      c.classList.toggle('edit-selected', editState.selected.has(c.dataset.gameId));
-    });
-    refreshToolbar();
-  });
+  selectAll.addEventListener('click', selectAllFiltered);
 
   const clearSel = editEl('button', 'edit-btn', 'Clear selection');
   clearSel.id = 'edit-clear-sel';
   clearSel.type = 'button';
-  clearSel.addEventListener('click', () => {
-    editState.selected.clear();
-    document.querySelectorAll('.game-card.edit-selected').forEach(c => c.classList.remove('edit-selected'));
-    refreshToolbar();
-  });
+  clearSel.addEventListener('click', clearSelection);
 
   const tagSel = editEl('button', 'edit-btn edit-btn-primary', 'Tag selected…');
   tagSel.id = 'edit-tag-selected';
@@ -283,7 +302,7 @@ function openTokenModal(afterSave) {
   openModal(modal => {
     modal.appendChild(editEl('h2', 'edit-modal-title', 'GitHub token'));
     const p = editEl('p', 'edit-modal-sub');
-    p.append('Saving needs a token that can write to this repository only. ');
+    p.append('Saving tags and the Update button need a token that can write to this repository only. ');
     const a = editEl('a', '', 'Create one here');
     a.href = 'https://github.com/settings/personal-access-tokens/new';
     a.target = '_blank';
@@ -296,6 +315,7 @@ function openTokenModal(afterSave) {
       'Token name: anything (e.g. "Meplay tags"). Expiration: your choice.',
       `Repository access: "Only select repositories" → ${MYTAGS_REPO}.`,
       'Permissions → Repository permissions → Contents: "Read and write".',
+      'Permissions → Repository permissions → Actions: "Read and write" (needed for the Update button).',
       'Generate token, copy it, paste it below.'
     ].forEach(t => steps.appendChild(editEl('li', '', t)));
     modal.appendChild(steps);
@@ -445,6 +465,7 @@ async function saveTags() {
 // ---------- on / off ----------
 
 function setEditMode(on) {
+  if (on && typeof isSelectModeOn === 'function' && isSelectModeOn()) setSelectMode(false);   // only one mode at a time
   editState.on = on;
   document.body.classList.toggle('edit-mode', on);
   const btn = document.getElementById('edit-toggle');
@@ -457,9 +478,22 @@ function setEditMode(on) {
   refreshToolbar();
 }
 
-function setupEditButton() {
+// One box in the top bar that holds the buttons (Edit, Select, Update)
+function getHeaderActions() {
   const header = document.querySelector('header.search');
-  if (!header || document.getElementById('edit-toggle')) return;
+  if (!header) return null;
+  let box = document.getElementById('header-actions');
+  if (!box) {
+    box = editEl('div', 'header-actions');
+    box.id = 'header-actions';
+    header.appendChild(box);
+  }
+  return box;
+}
+
+function setupEditButton() {
+  const box = getHeaderActions();
+  if (!box || document.getElementById('edit-toggle')) return;
   const btn = editEl('button', 'edit-toggle', 'Edit');
   btn.id = 'edit-toggle';
   btn.type = 'button';
@@ -468,7 +502,149 @@ function setupEditButton() {
         !confirm('You have unsaved changes. Leave edit mode anyway? (they stay until you reload)')) return;
     setEditMode(!editState.on);
   });
-  header.appendChild(btn);
+  box.appendChild(btn);
+}
+
+// ---------- Update button (runs the GitHub Action that reads BGG) ----------
+
+const WORKFLOW_FILE = 'index.yml';
+const syncState = { busy: false, ready: false };
+
+const GH_REPO_API = () => `https://api.github.com/repos/${MYTAGS_REPO}`;
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function setSyncButton(text, opts = {}) {
+  const btn = document.getElementById('sync-btn');
+  if (!btn) return;
+  btn.textContent = text;
+  btn.disabled = !!opts.disabled;
+  btn.classList.toggle('ready', !!opts.ready);
+}
+
+async function ghListRuns(token) {
+  const res = await fetch(
+    `${GH_REPO_API()}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=5&t=${Date.now()}`,
+    { headers: ghHeaders(token), cache: 'no-store' }
+  );
+  if (!res.ok) throw new GhError(res.status);
+  const json = await res.json();
+  return json.workflow_runs || [];
+}
+
+async function ghDefaultBranch(token) {
+  try {
+    const res = await fetch(GH_REPO_API(), { headers: ghHeaders(token), cache: 'no-store' });
+    if (!res.ok) throw new GhError(res.status);
+    const json = await res.json();
+    return json.default_branch || 'master';
+  } catch (e) {
+    if (e instanceof GhError && (e.status === 401 || e.status === 403 || e.status === 404)) throw e;
+    return 'master';
+  }
+}
+
+async function ghDispatchWorkflow(token, branch) {
+  const res = await fetch(`${GH_REPO_API()}/actions/workflows/${WORKFLOW_FILE}/dispatches`, {
+    method: 'POST',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, ghHeaders(token)),
+    body: JSON.stringify({ ref: branch })
+  });
+  if (!res.ok) throw new GhError(res.status);   // success is 204 without a body
+}
+
+function describeUpdateError(e) {
+  if (e instanceof GhError) {
+    if (e.status === 401) return 'GitHub rejected the token (expired or wrong). Open edit mode → "Token" and paste a new one.';
+    if (e.status === 403) return 'The token cannot run workflows. It needs Actions: Read and write on this repo (edit the token on GitHub or create a new one).';
+    if (e.status === 404) return `Workflow or repository ${MYTAGS_REPO} not found for this token. Check its repository access and that it has the Actions permission.`;
+    if (e.status === 422) return 'GitHub refused to start the workflow. Check that it has "workflow_dispatch" and the branch exists.';
+    if (e.status === 'run-not-found') return 'Update was requested, but its run did not show up yet. Check the Actions tab on GitHub.';
+    if (e.status === 'watch-timeout') return 'The update is taking very long. Check the Actions tab on GitHub.';
+    return `GitHub error ${e.status}.`;
+  }
+  return 'Network problem. Check your connection and try again.';
+}
+
+// Follows one run until it is completed (every 8 s, at most 15 minutes)
+async function watchRun(token, runId) {
+  const deadline = Date.now() + 15 * 60 * 1000;
+  while (Date.now() < deadline) {
+    const runs = await ghListRuns(token);
+    let run = runs.find(r => r.id === runId);
+    if (!run) {   // pushed out of the short list by newer runs: ask for it directly
+      const res = await fetch(`${GH_REPO_API()}/actions/runs/${runId}?t=${Date.now()}`, { headers: ghHeaders(token), cache: 'no-store' });
+      if (!res.ok) throw new GhError(res.status);
+      run = await res.json();
+    }
+    if (run.status === 'completed') return run;
+    setSyncButton(run.status === 'queued' ? 'Queued…' : 'Updating…', { disabled: true });
+    await wait(8000);
+  }
+  throw new GhError('watch-timeout');
+}
+
+async function startUpdate() {
+  const btn = document.getElementById('sync-btn');
+  if (!btn || syncState.busy) return;                       // no double clicks
+  if (syncState.ready) { location.reload(); return; }       // finished: this click reloads
+
+  const token = getEditToken();
+  if (!token) { openTokenModal(startUpdate); return; }      // after saving the token, run again
+
+  syncState.busy = true;
+  setSyncButton('Starting…', { disabled: true });
+  try {
+    const runs = await ghListRuns(token);
+    const active = runs.find(r => r.status !== 'completed');
+    let runId;
+
+    if (active) {
+      // an update (for example the hourly one) is already running: just follow it
+      editToast('Update already started - it is still running');
+      runId = active.id;
+    } else {
+      const baseline = runs.reduce((max, r) => Math.max(max, r.id), 0);
+      const branch = await ghDefaultBranch(token);
+      await ghDispatchWorkflow(token, branch);
+      editToast('Update started - this can take a few minutes');
+
+      for (let i = 0; i < 20 && !runId; i++) {
+        await wait(3000);
+        const now = await ghListRuns(token);
+        const mine = now.find(r => r.id > baseline && r.event === 'workflow_dispatch');
+        if (mine) runId = mine.id;
+      }
+      if (!runId) throw new GhError('run-not-found');
+    }
+
+    const run = await watchRun(token, runId);
+    if (run.conclusion === 'success') {
+      syncState.ready = true;
+      setSyncButton('Reload ✓', { ready: true });
+      editToast('Update finished ✓  Press "Reload ✓" to see the new games');
+    } else {
+      setSyncButton('Update');
+      editToast(`The update ended with "${run.conclusion}". Check the Actions tab on GitHub.`, true);
+    }
+  } catch (e) {
+    setSyncButton('Update');
+    editToast(describeUpdateError(e), true);
+  } finally {
+    syncState.busy = false;
+    const b = document.getElementById('sync-btn');
+    if (b && !syncState.ready && b.textContent === 'Update') b.disabled = false;
+  }
+}
+
+function setupUpdateButton() {
+  const box = getHeaderActions();
+  if (!box || document.getElementById('sync-btn')) return;
+  const btn = editEl('button', 'edit-toggle sync-btn', 'Update');
+  btn.id = 'sync-btn';
+  btn.type = 'button';
+  btn.title = 'Update the game list from BGG now (instead of waiting for the hourly update)';
+  btn.addEventListener('click', startUpdate);
+  box.appendChild(btn);
 }
 
 window.addEventListener('beforeunload', e => {
@@ -476,3 +652,4 @@ window.addEventListener('beforeunload', e => {
 });
 
 setupEditButton();
+setupUpdateButton();

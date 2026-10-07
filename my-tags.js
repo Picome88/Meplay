@@ -3,11 +3,15 @@
 //
 // HOW IT WORKS
 //  * my_tags.json holds, for every game I tagged, its "type" and "status".
-//  * Inside one group (e.g. Type) the selected options combine with OR.
-//  * Different groups (Type, Status, players, time, ...) combine with AND.
+//  * Every option is a 4-state checkbox (Off / OR / AND / Exclude). The
+//    matching rule is the shared matchesTri() in app-sqlite.js.
+//  * Different filters (Type, Status, players, time, ...) combine with AND.
+//  * The colors of the tags are all in ONE table: TAG_COLORS (below).
 //
 // TO ADD A NEW FRIEND: add one line to the "Physical" options below, e.g.
 //   { key: 'sara', label: 'Sara' },
+// (it gets the brown "Physical" color by itself; to give it its own color,
+//  add one line to TAG_COLORS, e.g.  'type/sara': '#336699',)
 // =====================================================================
 
 // Where my_tags.json lives (used by edit mode, see my-edit.js)
@@ -27,16 +31,16 @@ const TAG_GROUPS = [
           { key: 'mine', label: 'Mine' },
           { key: 'mohsen', label: 'Mohsen' },
           { key: 'amirali', label: 'Amirali' },
-          { key: 'other', label: 'Other' }
+          { key: 'other', label: 'Others' }
         ]
       },
       {
         key: 'digital',
         label: 'Digital (any)',
         options: [
-          { key: 'bga_ready', label: 'BGA - ready to play' },
-          { key: 'bga_beta', label: 'BGA - alpha / beta' },
-          { key: 'other_site', label: 'Other site' }
+          { key: 'bga_ready', label: 'BGA (Normal)' },
+          { key: 'bga_beta', label: 'BGA (Alfa/Beta)' },
+          { key: 'other_site', label: 'Elsewhere' }
         ]
       }
     ]
@@ -49,8 +53,8 @@ const TAG_GROUPS = [
         key: null, // no parent heading: plain list
         options: [
           { key: 'pnp', label: 'PnP' },
-          { key: 'produced_iran', label: 'Produced (Iran)' },
-          { key: 'produced_original', label: 'Produced (Original)' }
+          { key: 'produced_iran', label: 'Iranian' },
+          { key: 'produced_original', label: 'Original' }
         ]
       }
     ]
@@ -62,15 +66,57 @@ const TAG_GROUPS = [
       {
         key: null, // no parent heading: plain list
         options: [
-          { key: 'interested', label: "I'm interested in" },
-          { key: 'learned', label: 'I just learned it' },
-          { key: 'played', label: 'I have played' },
-          { key: 'replay', label: 'Wanna replay' }
+          { key: 'interested', label: 'Wanted' },
+          { key: 'learned', label: 'Known' },
+          { key: 'played', label: 'Played' },
+          { key: 'replay', label: 'Revisit' }
         ]
       }
     ]
   }
 ];
+
+// ---------------------------------------------------------------------
+// TAG COLORS - the one and only place where tag colors are defined.
+// Key = "group/option" (the same keys as in TAG_GROUPS above).
+// Text on every tag is white. All colors keep a contrast of at least 4.5:1.
+// An option without its own row uses the row of its parent heading
+// (e.g. a new friend under Physical -> 'type/physical'), then grey.
+// ---------------------------------------------------------------------
+const TAG_TEXT_COLOR = '#ffffff';
+const TAG_DEFAULT_COLOR = '#555555';
+const TAG_COLORS = {
+  // Type > Physical (brown family)
+  'type/physical': '#9C6040',   // default for any new friend under Physical
+  'type/mine': '#9C6040',
+  'type/mohsen': '#9C6040',
+  'type/amirali': '#9C6040',
+  'type/other': '#7A6A60',
+
+  // Type > Digital
+  'type/bga_ready': '#4169E1',  // BGA (Normal)
+  'type/bga_beta': '#A044D0',   // BGA (Alfa/Beta)
+  'type/other_site': '#0B7FA8', // Elsewhere
+
+  // Production (all the same)
+  'production/pnp': '#587890',
+  'production/produced_iran': '#587890',
+  'production/produced_original': '#587890',
+
+  // Status
+  'status/interested': '#E0147A', // Wanted
+  'status/learned': '#0B7F3C',    // Known
+  'status/played': '#7D7269',     // Played
+  'status/replay': '#C44409'      // Revisit
+};
+
+function colorForTag(groupId, optionKey) {
+  const exact = TAG_COLORS[`${groupId}/${optionKey}`];
+  if (exact) return exact;
+  const group = TAG_GROUPS.find(g => g.id === groupId);
+  const parent = group ? sectionKeyOf(group, optionKey) : null;
+  return (parent && TAG_COLORS[`${groupId}/${parent}`]) || TAG_DEFAULT_COLOR;
+}
 
 // myTagData = { "173346": { type: ["mine"], production: ["pnp"], status: ["played"] }, ... }
 let myTagData = {};
@@ -137,78 +183,6 @@ function applyMyTags(game) {
   game.my_tags = result;
 }
 
-// ---------- filter state ----------
-
-function emptyMyTagSelection() {
-  const sel = {};
-  TAG_GROUPS.forEach(g => { sel[g.id] = []; });
-  return sel;
-}
-
-function getMyTagFiltersFromURL(params) {
-  const sel = emptyMyTagSelection();
-  TAG_GROUPS.forEach(g => {
-    sel[g.id] = params.get(g.id)?.split(',').filter(Boolean) || [];
-  });
-  return sel;
-}
-
-function getMyTagFiltersFromUI() {
-  const sel = emptyMyTagSelection();
-  TAG_GROUPS.forEach(g => {
-    sel[g.id] = Array.from(
-      document.querySelectorAll(`input[type="checkbox"][name="my_${g.id}"]:checked`)
-    ).map(cb => cb.value);
-  });
-  return sel;
-}
-
-function setMyTagURLParams(params, filters) {
-  const sel = filters.selectedMyTags || {};
-  TAG_GROUPS.forEach(g => {
-    if (sel[g.id]?.length) params.set(g.id, sel[g.id].join(','));
-  });
-}
-
-function restoreMyTagUI(state) {
-  const sel = state.selectedMyTags || {};
-  TAG_GROUPS.forEach(g => {
-    (sel[g.id] || []).forEach(value => {
-      const cb = document.querySelector(
-        `input[type="checkbox"][name="my_${g.id}"][value="${CSS.escape(value)}"]`
-      );
-      if (cb) cb.checked = true;
-    });
-  });
-}
-
-function myTagsActive(filters) {
-  const sel = filters.selectedMyTags || {};
-  return TAG_GROUPS.some(g => (sel[g.id] || []).length > 0);
-}
-
-function updateMyTagActiveStates(filters) {
-  const sel = filters.selectedMyTags || {};
-  TAG_GROUPS.forEach(g => {
-    const el = document.getElementById(`facet-my-${g.id}`);
-    if (!el) return;
-    el.classList.toggle('filter-active', (sel[g.id] || []).length > 0);
-  });
-}
-
-// The heart of the system:
-//  inside a group -> OR, between groups -> AND
-function gameMatchesMyTags(game, selectedMyTags) {
-  if (!selectedMyTags) return true;
-  for (const g of TAG_GROUPS) {
-    const wanted = selectedMyTags[g.id] || [];
-    if (wanted.length === 0) continue;
-    const have = game.my_tags ? game.my_tags[g.id] : null;
-    if (!have || !wanted.some(k => have.has(k))) return false;
-  }
-  return true;
-}
-
 // ---------- building the sidebar dropdowns ----------
 
 function setupMyTagFilters() {
@@ -233,23 +207,6 @@ function setupMyTagFilters() {
         if (label) label.style.paddingLeft = '20px';
       }
     });
-  });
-}
-
-function updateMyTagCounts(filters) {
-  TAG_GROUPS.forEach(group => {
-    const without = {
-      ...filters,
-      selectedMyTags: { ...(filters.selectedMyTags || emptyMyTagSelection()), [group.id]: [] }
-    };
-    const games = filterGames(allGames, without);
-    const counts = {};
-    games.forEach(game => {
-      game.my_tags[group.id].forEach(k => {
-        counts[k] = (counts[k] || 0) + 1;
-      });
-    });
-    updateCountsInDOM(`facet-my-${group.id}`, counts, true);
   });
 }
 
@@ -283,6 +240,8 @@ function renderMyTagsRows(container, id) {
       const chip = document.createElement('span');
       chip.className = `my-chip my-chip-${g.id}`;
       chip.textContent = labelForTag(g.id, key);
+      chip.style.background = colorForTag(g.id, key);
+      chip.style.color = TAG_TEXT_COLOR;
       row.appendChild(chip);
       total++;
     });
@@ -311,42 +270,51 @@ function renderMyTagsSection(fragment, game) {
   panel.appendChild(section);
 }
 
-// ---------- show the chosen options in the filter button ----------
+// ---------- show the chosen options as chips under each filter button ----------
 
 // Radio filters use these values for "no filter"
 const FILTER_NEUTRAL_VALUES = ['any', '0-100', '0-9999'];
 
-// "Production" -> "Production: PnP, Produced (Iran)"
-function updateFilterSummaries() {
-  document.querySelectorAll('details.filter-dropdown').forEach(details => {
-    const titleEl = details.querySelector('summary .filter-title');
-    if (!titleEl) return;
-    if (!details.dataset.baseTitle) details.dataset.baseTitle = titleEl.textContent;
+// Colors of the chips come from the CSS variables --state-or / --state-and / --state-not
+// (the same ones that color the checkboxes).
+// Builds the chips of every filter from the current state of its options.
+function updateFilterChips() {
+  document.querySelectorAll('.filter-group').forEach(group => {
+    const details = group.querySelector('details.filter-dropdown');
+    const chips = group.querySelector('.filter-chips');
+    if (!details || !chips) return;
+    chips.textContent = '';
 
-    const checked = Array.from(details.querySelectorAll('input:checked'))
-      .filter(input => !FILTER_NEUTRAL_VALUES.includes(input.value));
+    const addChip = (setName, stateLabel, icon, text) => {
+      const chip = document.createElement('span');
+      chip.className = `filter-chip filter-chip-${setName}`;
+      chip.title = `${stateLabel}: ${text}`;
+      const iconEl = document.createElement('span');
+      iconEl.className = 'filter-chip-icon';
+      iconEl.textContent = icon;
+      const textEl = document.createElement('span');
+      textEl.textContent = text;
+      chip.append(iconEl, textEl);
+      chips.appendChild(chip);
+    };
 
-    // My tag groups: hide a parent heading (e.g. "Physical") when one of its
-    // own options is ticked, since the option already says it.
-    const group = TAG_GROUPS.find(g => details.id === `facet-my-${g.id}`);
-    const hiddenValues = new Set();
-    if (group) {
-      const values = new Set(checked.map(i => i.value));
-      group.sections.forEach(sec => {
-        if (sec.key && sec.options.some(o => values.has(o.key))) hiddenValues.add(sec.key);
-      });
-    }
+    const labelOf = input => {
+      const el = input.closest('label')?.querySelector('.filter-label');
+      return (el ? el.textContent : input.value).replace(/\s*\(any\)\s*$/i, '').trim();
+    };
 
-    const labels = checked
-      .filter(input => !hiddenValues.has(input.value))
-      .map(input => {
-        const el = input.closest('label')?.querySelector('.filter-label');
-        return (el ? el.textContent : input.value).replace(/\s*\(any\)\s*$/i, '').trim();
-      })
-      .filter(Boolean);
-
-    const text = labels.length ? `${details.dataset.baseTitle}: ${labels.join(', ')}` : details.dataset.baseTitle;
-    titleEl.textContent = text;
-    titleEl.title = text;
+    details.querySelectorAll('input').forEach(input => {
+      if (input.type === 'radio') {
+        if (input.checked && !FILTER_NEUTRAL_VALUES.includes(input.value)) {
+          addChip('or', 'Include (OR)', '\u2713', labelOf(input));
+        }
+        return;
+      }
+      const state = Number(input.dataset.state) || 0;
+      if (state > 0 && labelOf(input)) {
+        const st = TRI_STATES[state];
+        addChip(st.set, st.label, st.icon, labelOf(input));
+      }
+    });
   });
 }
