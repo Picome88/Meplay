@@ -1780,3 +1780,13 @@ details[open] + .filter-chips {
         min-height: 36px;
     }
 }
+
+/* =====================================================================
+   Filters hidden for now: Min age, Number of plays, Previous players.
+   Their code is still in app-sqlite.js. To show them again, delete this block.
+   ===================================================================== */
+#facet-min-age,
+#facet-numplays,
+#facet-previous-players {
+    display: none;
+}

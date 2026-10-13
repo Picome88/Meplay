@@ -19,6 +19,9 @@
 //
 // TO ADD A NEW FIELD: add one row to EXTRACT_FIELDS below. The chip, the
 // Markdown line, the Compact part and the CSV column come by themselves.
+// TO HIDE A FIELD (without deleting it): put  hidden: true  in its row.
+// TO SHOW IT AGAIN: remove that  hidden: true  (Min age and My plays are
+// hidden for now).
 //
 // Needs from my-edit.js: editState, editEl, editToast, openModal, closeModal,
 //   gameById, getHeaderActions
@@ -126,6 +129,7 @@ function exList(value) {
 // text:   the full value ('' = empty, the line is left out)
 // short:  the short value (Compact). Default: same as text.
 // csv:    the value in CSV. Default: same as text.
+// hidden: true = not shown as a chip and never in the output (code is kept).
 
 function playersInfo(game) {
   const best = [];
@@ -203,7 +207,7 @@ const EXTRACT_FIELDS = [
       const w = exNum(g.weight);
       return w ? `w${w.toFixed(1)}` : '';
     } },
-  { key: 'age', label: 'Min age', line: 'Min age', group: 'Play',
+  { key: 'age', label: 'Min age', line: 'Min age', group: 'Play', hidden: true,
     text: g => {
       const a = exNum(g.min_age);
       return a ? `${a}+` : '';
@@ -248,7 +252,7 @@ const EXTRACT_FIELDS = [
   { key: 'tags', label: 'My tags', line: 'My tags', group: 'Mine',
     text: g => myTagItems(g).map(t => t.label).join(', '),
     csv: g => myTagItems(g).map(t => t.label).join('; ') },
-  { key: 'plays', label: 'My plays', line: 'My plays', group: 'Mine',
+  { key: 'plays', label: 'My plays', line: 'My plays', group: 'Mine', hidden: true,
     text: g => {
       const n = exNum(g.numplays);
       return n ? String(n) : '';
@@ -258,6 +262,9 @@ const EXTRACT_FIELDS = [
       return n ? exPlural(n, 'play') : '';
     } }
 ];
+
+// The fields in use (the hidden ones are left out everywhere)
+const exActiveFields = () => EXTRACT_FIELDS.filter(f => !f.hidden);
 
 const exFieldText = (field, game) => String(field.text(game) || '');
 const exFieldShort = (field, game) => String((field.short || field.text)(game) || '');
@@ -421,7 +428,7 @@ function buildExport(games, options) {
   const opts = options || {};
   const format = extractFormat(opts.format);
   const keys = Array.isArray(opts.fields) ? opts.fields : [];
-  const fields = format.hasFields ? EXTRACT_FIELDS.filter(f => keys.includes(f.key)) : [];
+  const fields = format.hasFields ? exActiveFields().filter(f => keys.includes(f.key)) : [];
   const descLevel = format.hasDesc ? (opts.desc || 'none') : 'none';
   const items = games.length ? sortGames(games, opts.sort) : [];
 
@@ -460,7 +467,7 @@ function exportFileName(ext, date) {
 function defaultFormatSettings(formatKey) {
   const d = extractFormat(formatKey).defaults;
   return {
-    fields: d.fields === 'all' ? EXTRACT_FIELDS.map(f => f.key) : d.fields.slice(),
+    fields: d.fields === 'all' ? exActiveFields().map(f => f.key) : d.fields.slice(),
     desc: d.desc,
     sort: d.sort
   };
@@ -483,7 +490,7 @@ function sanitizeExtractPrefs(raw) {
     const target = prefs.formats[format.key];
     if (!s || typeof s !== 'object') return;
     if (format.hasFields && Array.isArray(s.fields)) {
-      target.fields = EXTRACT_FIELDS.map(f => f.key).filter(key => s.fields.includes(key));
+      target.fields = exActiveFields().map(f => f.key).filter(key => s.fields.includes(key));
     }
     if (format.hasDesc && EXTRACT_DESC_LEVELS.some(d => d.value === s.desc)) target.desc = s.desc;
     if (EXTRACT_SORTS.some(o => o.value === s.sort)) target.sort = s.sort;
@@ -700,7 +707,7 @@ function openExtractModal(options) {
     fieldsBox.setAttribute('aria-labelledby', 'extract-label-fields');
     let lastGroup = null;
     let groupBox = null;
-    EXTRACT_FIELDS.forEach(field => {
+    exActiveFields().forEach(field => {
       if (field.group !== lastGroup) {
         groupBox = editEl('div', 'extract-chip-group');
         fieldsBox.appendChild(groupBox);
