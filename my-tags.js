@@ -273,10 +273,70 @@ function renderMyTagsSection(fragment, game) {
 // ---------- show the chosen options as chips under each filter button ----------
 
 // Radio filters use these values for "no filter"
-const FILTER_NEUTRAL_VALUES = ['any', '0-100', '0-9999'];
+const FILTER_NEUTRAL_VALUES = ['0-100', '0-9999'];
 
 // Colors of the chips come from the CSS variables --state-or / --state-and / --state-not
 // (the same ones that color the checkboxes).
+
+// ONE builder for every chip (filter chips here, the "List" chip in my-list.js):
+//   [ x ] [ label ] [ mark ]   - clicking anywhere on the chip removes it.
+//   stateClass: "or" / "and" / "not" (state colors) or "neutral" (no state, e.g. List)
+//   mark:       small extra sign after the label (the "&" of AND), optional
+//   strike:     draw the label with a line through it (Exclude), optional
+//   title / ariaLabel: tooltip and screen reader text
+//   onRemove(event): called on click / Enter / Space
+function buildFilterChip({ stateClass, label, mark, strike, title, ariaLabel, onRemove }) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = `filter-chip filter-chip-${stateClass}`;
+  if (title) chip.title = title;
+  chip.setAttribute('aria-label', ariaLabel || label);
+
+  const x = document.createElement('span');
+  x.className = 'filter-chip-x';
+  x.setAttribute('aria-hidden', 'true');
+  x.textContent = '\u00D7';
+
+  const text = document.createElement('span');
+  text.className = strike ? 'filter-chip-label filter-chip-strike' : 'filter-chip-label';
+  text.textContent = label;
+  chip.append(x, text);
+
+  if (mark) {
+    const markEl = document.createElement('span');
+    markEl.className = 'filter-chip-mark';
+    markEl.setAttribute('aria-hidden', 'true');
+    markEl.textContent = mark;
+    chip.appendChild(markEl);
+  }
+
+  if (onRemove) chip.addEventListener('click', onRemove);
+  return chip;
+}
+
+// Takes one option out of its filter (the chip was clicked)
+function removeFilterOption(input) {
+  if (input.type === 'radio') {
+    // Min age / Num plays: back to the neutral option
+    const neutral = Array.from(document.querySelectorAll(`input[type="radio"][name="${input.name}"]`))
+      .find(r => FILTER_NEUTRAL_VALUES.includes(r.value));
+    if (neutral) neutral.checked = true;
+  } else {
+    setTriState(input, 0);
+  }
+  onFilterChange();
+}
+
+// After a chip is removed with the keyboard the chips are rebuilt: put the focus
+// on the chip that took its place, or on the filter button when none is left
+function refocusAfterChipRemoval(groupIndex, chipIndex) {
+  const group = document.querySelectorAll('.filter-group')[groupIndex];
+  if (!group) return;
+  const next = group.querySelectorAll('.filter-chip')[chipIndex];
+  const target = next || group.querySelector('details.filter-dropdown > summary');
+  if (target) target.focus();
+}
+
 // Builds the chips of every filter from the current state of its options.
 function updateFilterChips() {
   document.querySelectorAll('.filter-group').forEach(group => {
@@ -285,36 +345,39 @@ function updateFilterChips() {
     if (!details || !chips) return;
     chips.textContent = '';
 
-    const addChip = (setName, stateLabel, icon, text) => {
-      const chip = document.createElement('span');
-      chip.className = `filter-chip filter-chip-${setName}`;
-      chip.title = `${stateLabel}: ${text}`;
-      const iconEl = document.createElement('span');
-      iconEl.className = 'filter-chip-icon';
-      iconEl.textContent = icon;
-      const textEl = document.createElement('span');
-      textEl.textContent = text;
-      chip.append(iconEl, textEl);
-      chips.appendChild(chip);
-    };
-
     const labelOf = input => {
       const el = input.closest('label')?.querySelector('.filter-label');
       return (el ? el.textContent : input.value).replace(/\s*\(any\)\s*$/i, '').trim();
     };
 
+    const addChip = (input, state) => {
+      const st = TRI_STATES[state];
+      const name = labelOf(input);
+      const chip = buildFilterChip({
+        stateClass: st.set,
+        label: name,
+        mark: state === 2 ? '&' : '',
+        strike: state === 3,
+        title: `Click to remove: ${name} (${st.label})`,
+        ariaLabel: `Remove ${name} (${st.label})`,
+        onRemove: event => {
+          const groups = Array.from(document.querySelectorAll('.filter-group'));
+          const groupIndex = groups.indexOf(group);
+          const chipIndex = Array.from(chips.children).indexOf(chip);
+          removeFilterOption(input);
+          if (event.detail === 0) refocusAfterChipRemoval(groupIndex, chipIndex);   // keyboard
+        }
+      });
+      chips.appendChild(chip);
+    };
+
     details.querySelectorAll('input').forEach(input => {
       if (input.type === 'radio') {
-        if (input.checked && !FILTER_NEUTRAL_VALUES.includes(input.value)) {
-          addChip('or', 'Include (OR)', '\u2713', labelOf(input));
-        }
+        if (input.checked && !FILTER_NEUTRAL_VALUES.includes(input.value)) addChip(input, 1);
         return;
       }
       const state = Number(input.dataset.state) || 0;
-      if (state > 0 && labelOf(input)) {
-        const st = TRI_STATES[state];
-        addChip(st.set, st.label, st.icon, labelOf(input));
-      }
+      if (state > 0 && labelOf(input)) addChip(input, state);
     });
   });
 }
