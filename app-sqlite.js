@@ -233,6 +233,7 @@ function loadAllGames() {
 
 function initializeUI() {
   enableListButton();   // my-list.js: allGames is ready
+  enableExtractButton();   // my-extract.js: allGames is ready
   setupSearchBox();
   setupFilters();
   setupSorting();

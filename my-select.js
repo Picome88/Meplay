@@ -1,5 +1,5 @@
 // =====================================================================
-// my-select.js  -  "Select" mode + "Extract names" window
+// my-select.js  -  "Select" mode
 //
 // HOW IT WORKS
 //  * "Select" button (top bar, next to Edit) turns select mode on/off.
@@ -7,105 +7,19 @@
 //    It uses the SAME selection as Edit mode (editState.selected in my-edit.js),
 //    so there is only one selection engine.
 //  * The bottom bar shows "N selected", "Select all filtered", "Clear selection"
-//    and "Extract…". Extract opens a window with the names of the selected
-//    games (one per line, A to Z) and a Copy button.
+//    and "Extract…". Extract opens the Extract window (my-extract.js) with
+//    the selected games.
 //  * Read-only: nothing is saved, no token, no network, nothing in the URL.
 //
 // Needs from my-edit.js: editState, editEl, editToast, openModal, closeModal,
-//   gameById, selectAllFiltered, clearSelection, getHeaderActions,
-//   setEditMode
+//   selectAllFiltered, clearSelection, getHeaderActions, setEditMode
+// Needs from my-extract.js: openExtractModal (called only on click)
 // =====================================================================
 
 const selectState = { on: false };
 
 function isSelectModeOn() {
   return selectState.on;
-}
-
-// ---------- names list ----------
-
-// "Tom &amp; Jerry" -> "Tom & Jerry" (a textarea never runs scripts)
-function decodeHtmlEntities(text) {
-  const t = document.createElement('textarea');
-  t.innerHTML = String(text);
-  return t.value;
-}
-
-// The text shown in the Extract window: one name per line, A to Z, no numbering
-function buildNamesText() {
-  const names = [];
-  editState.selected.forEach(id => {
-    const game = gameById(id);
-    if (game) names.push(decodeHtmlEntities(game.name));
-  });
-  names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  return { names, text: names.join('\n') };
-}
-
-// ---------- copy ----------
-
-async function copyText(textarea) {
-  const text = textarea.value;
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (e) { /* fall back below */ }
-
-  try {
-    textarea.focus();
-    textarea.select();
-    textarea.setSelectionRange(0, text.length);
-    if (document.execCommand('copy')) return true;
-  } catch (e) { /* ignore */ }
-
-  textarea.focus();
-  textarea.select();   // leave the text selected so Ctrl+C works
-  return false;
-}
-
-// ---------- Extract window ----------
-
-function openExtractModal() {
-  const { names, text } = buildNamesText();
-  if (!names.length) return;
-
-  openModal(modal => {
-    modal.appendChild(editEl('h2', 'edit-modal-title', 'Extract names'));
-    modal.appendChild(editEl('p', 'edit-modal-sub', `${names.length} game${names.length === 1 ? '' : 's'}`));
-
-    const area = document.createElement('textarea');
-    area.className = 'extract-textarea';
-    area.readOnly = true;
-    area.rows = 12;
-    area.spellcheck = false;
-    area.value = text;
-    modal.appendChild(area);
-
-    const actions = editEl('div', 'edit-modal-actions');
-    const close = editEl('button', 'edit-btn', 'Close');
-    close.type = 'button';
-    close.addEventListener('click', closeModal);
-
-    const copy = editEl('button', 'edit-btn edit-btn-primary', 'Copy');
-    copy.type = 'button';
-    let resetTimer = null;
-    copy.addEventListener('click', async () => {
-      const ok = await copyText(area);
-      if (ok) {
-        copy.textContent = 'Copied ✓';
-        editToast(`Copied ${names.length} name${names.length === 1 ? '' : 's'}`);
-        clearTimeout(resetTimer);
-        resetTimer = setTimeout(() => { copy.textContent = 'Copy'; }, 2000);
-      } else {
-        editToast('Could not copy automatically. The text is selected: press Ctrl+C.', true);
-      }
-    });
-
-    actions.append(close, copy);
-    modal.appendChild(actions);
-  });
 }
 
 // ---------- bottom bar ----------
@@ -131,7 +45,7 @@ function buildSelectToolbar() {
   const extract = editEl('button', 'edit-btn edit-btn-primary', 'Extract…');
   extract.id = 'select-extract';
   extract.type = 'button';
-  extract.addEventListener('click', openExtractModal);
+  extract.addEventListener('click', () => openExtractModal({ scope: 'selected' }));
 
   selectToolbar.append(info, selectAll, clearSel, extract);
   document.body.appendChild(selectToolbar);

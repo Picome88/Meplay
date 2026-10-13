@@ -1142,7 +1142,7 @@ body.select-mode .edit-tag-btn {
 }
 
 /* =====================================================================
-   Select mode + Extract window (my-select.js)
+   Select mode (my-select.js)
    ===================================================================== */
 /* room for the bottom bar so it never hides the pagination for good */
 body.select-mode {
@@ -1163,6 +1163,212 @@ body.select-mode {
     font-size: 14px;
     line-height: 1.4;
     resize: vertical;
+}
+
+/* =====================================================================
+   Extract window (my-extract.js)
+   ===================================================================== */
+.edit-modal.edit-modal-wide {
+    width: min(860px, 100%);
+}
+
+.extract-row {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: start;
+    gap: 6px 12px;
+    margin: 10px 0;
+}
+
+.extract-row[hidden],
+.extract-note[hidden] {
+    display: none;
+}
+
+.extract-label {
+    padding-top: 5px;
+    font-weight: 600;
+    color: #222;
+}
+
+.extract-seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+    width: fit-content;
+    border: 1.5px solid #333;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.extract-seg-btn {
+    padding: 6px 14px;
+    min-height: 34px;
+    border: 0;
+    background: #fff;
+    color: #333;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.extract-seg-btn.active {
+    background: #333;
+    color: #fff;
+}
+
+.extract-seg-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.extract-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+}
+
+.extract-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.extract-chip {
+    padding: 5px 12px;
+    min-height: 32px;
+    border: 1.5px solid #333;
+    border-radius: 999px;
+    background: #fff;
+    color: #333;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.extract-chip[aria-pressed="true"] {
+    background: #333;
+    color: #fff;
+}
+
+.extract-chip[aria-pressed="false"] .extract-chip-check {
+    display: none;
+}
+
+.extract-chip-check {
+    margin-right: 4px;
+}
+
+.extract-seg-btn:focus-visible,
+.extract-chip:focus-visible,
+.extract-select:focus-visible,
+.extract-instruction:focus-visible,
+.extract-check input:focus-visible {
+    outline: 2px solid var(--state-or);
+    outline-offset: 2px;
+}
+
+.extract-desc-sort {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    column-gap: 24px;
+}
+
+.extract-sort-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+}
+
+.extract-sort-box .extract-label {
+    padding-top: 0;
+}
+
+.extract-select {
+    padding: 6px 10px;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    background: #fff;
+    color: #222;
+    font: inherit;
+}
+
+.extract-ai-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.extract-instruction {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font: inherit;
+    resize: vertical;
+}
+
+.extract-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.extract-preview {
+    height: 260px;
+    margin-top: 10px;
+}
+
+.extract-note,
+.extract-count {
+    margin: 6px 0 0;
+    line-height: 1.4;
+}
+
+.extract-count-warn {
+    font-weight: 700;
+    color: var(--state-not);
+}
+
+/* buttons stay in view while the window scrolls */
+.extract-actions {
+    position: sticky;
+    bottom: -18px;
+    margin: 12px -20px -18px;
+    padding: 12px 20px 18px;
+    background: #fff;
+    border-top: 1px solid #ddd;
+}
+
+.extract-actions .extract-reset {
+    margin-right: auto;
+}
+
+@media screen and (max-width: 640px) {
+    .extract-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .extract-label {
+        padding-top: 0;
+    }
+
+    .extract-preview {
+        height: 150px;
+    }
+
+    .extract-actions {
+        flex-wrap: wrap;
+    }
+
+    .extract-actions .edit-btn {
+        min-height: 40px;
+    }
 }
 
 /* =====================================================================

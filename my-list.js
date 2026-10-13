@@ -22,7 +22,8 @@
 //
 // Needs from my-edit.js: editState, editEl, editToast, openModal, closeModal,
 //   clearSelection, selectAllFiltered, openTagModal, setEditMode, getHeaderActions
-// Needs from my-select.js: decodeHtmlEntities, copyText, isSelectModeOn, setSelectMode
+// Needs from my-extract.js: decodeHtmlEntities, copyText
+// Needs from my-select.js: isSelectModeOn, setSelectMode
 // Needs from my-tags.js: buildFilterChip
 // Needs from app-sqlite.js: allGames, filteredGames, onFilterChange
 // =====================================================================
