@@ -263,6 +263,7 @@
     "270168": {"type":["mohsen"],"production":["produced_iran"]},
     "270269": {"type":["mohsen"],"production":["produced_iran"]},
     "270673": {"type":["mohsen"],"production":["produced_iran"]},
+    "270970": {"type":["mohsen"],"production":["produced_iran"]},
     "271324": {"type":["mohsen","bga_ready"],"production":["produced_iran"],"status":["learned","played","replay"]},
     "271601": {"type":["amirali"],"production":["produced_iran"]},
     "273477": {"type":["mohsen","bga_ready"],"production":["produced_iran"],"status":["interested"]},
