@@ -32,6 +32,7 @@
     "2389": {"type":["mohsen"],"production":["produced_iran"]},
     "2394": {"type":["mohsen"],"production":["produced_iran"]},
     "2397": {"type":["mohsen"],"production":["produced_iran"]},
+    "2452": {"type":["mohsen"],"production":["produced_iran"]},
     "2653": {"type":["mohsen"],"production":["produced_iran"]},
     "2655": {"type":["mine","mohsen","bga_ready","amirali"],"production":["pnp","produced_iran"],"status":["learned","played","replay"]},
     "3076": {"type":["bga_ready"],"status":["interested"]},
