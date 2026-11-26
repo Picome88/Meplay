@@ -301,6 +301,7 @@
     "284435": {"type":["mohsen"],"production":["produced_iran"]},
     "284653": {"type":["bga_ready"],"status":["played"]},
     "284777": {"type":["amirali"],"production":["produced_iran"]},
+    "284778": {"type":["amirali"],"production":["produced_iran"]},
     "286096": {"type":["bga_ready"],"status":["interested"]},
     "286749": {"type":["mohsen","bga_ready"],"production":["produced_iran"],"status":["interested"]},
     "287954": {"type":["amirali","mohsen"],"production":["produced_iran"]},
