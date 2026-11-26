@@ -427,6 +427,7 @@
     "422732": {"type":["bga_ready","mohsen"],"status":["played"]},
     "424152": {"type":["bga_ready"],"status":["played"]},
     "425428": {"type":["mohsen","bga_ready"],"production":["produced_iran"],"status":["learned","played","replay"]},
+    "428308": {"type":["amirali"],"production":["produced_iran"]},
     "431038": {"type":["mohsen"],"production":["produced_iran"]},
     "431305": {"type":["bga_ready"],"status":["interested"]},
     "433908": {"type":["bga_ready"],"status":["played"]},
